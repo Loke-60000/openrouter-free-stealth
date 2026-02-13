@@ -1,0 +1,18 @@
+services:
+  openrouter-api:
+    build: .
+    container_name: openrouter-api
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      RUST_LOG: "openrouter_api=info,tower_http=info"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
