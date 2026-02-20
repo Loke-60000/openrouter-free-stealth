@@ -1,10 +1,10 @@
+mod api;
 mod config;
 mod model;
-mod proxy;
 mod state;
 
+use api::{health, not_found, status, tier_router, Tier};
 use axum::{extract::DefaultBodyLimit, routing::get, Router};
-use proxy::{health, status, tier_router, Tier};
 use state::AppState;
 use tower_http::cors::CorsLayer;
 use tracing::info;
@@ -32,6 +32,7 @@ async fn main() {
         .nest("/stealth/v1", tier_router(Tier::Stealth))
         .route("/health", get(health))
         .route("/status", get(status))
+        .fallback(not_found)
         .layer(CorsLayer::permissive())
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .with_state(state);

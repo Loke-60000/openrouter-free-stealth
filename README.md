@@ -6,14 +6,16 @@ I use OpenWebUI to experiment with new models, but some have privacy restriction
 
 ## Endpoints
 
-| Endpoint                       | Description                 |
-| ------------------------------ | --------------------------- |
-| `/free/v1/models`              | List free models            |
-| `/free/v1/chat/completions`    | Chat with free models       |
-| `/stealth/v1/models`           | List stealth/cloaked models |
-| `/stealth/v1/chat/completions` | Chat with stealth models    |
-| `/health`                      | Health check                |
-| `/status`                      | Cache stats                 |
+| Endpoint                       | Description                              |
+| ------------------------------ | ---------------------------------------- |
+| `/free/v1/models`              | List free models                         |
+| `/free/v1/chat/completions`    | Chat Completions (free models)           |
+| `/free/v1/responses`           | Responses API with tool/function support |
+| `/stealth/v1/models`           | List stealth/cloaked models              |
+| `/stealth/v1/chat/completions` | Chat Completions (stealth models)        |
+| `/stealth/v1/responses`        | Responses API with tool/function support |
+| `/health`                      | Health check                             |
+| `/status`                      | Cache stats                              |
 
 Filter models: `/free/v1/models?supports=tools,vision`
 

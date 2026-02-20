@@ -28,12 +28,14 @@ pub struct Model {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub context_length: Option<u64>,
     #[serde(default)]
     pub pricing: Option<Pricing>,
     #[serde(default)]
     pub architecture: Option<Architecture>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub top_provider: Option<TopProvider>,
     #[serde(default)]
     pub supported_parameters: Option<Vec<String>>,
@@ -95,8 +97,8 @@ impl Model {
 
     pub fn classify(all: &[Self]) -> (Vec<Self>, Vec<Self>) {
         let usable = |m: &&Self| !m.is_meta_router();
-        let free: Vec<_> = all.iter().filter(|m| m.is_free()).filter(usable).cloned().collect();
         let stealth: Vec<_> = all.iter().filter(|m| m.is_stealth()).filter(usable).cloned().collect();
+        let free: Vec<_> = all.iter().filter(|m| m.is_free() && !m.is_stealth()).filter(usable).cloned().collect();
         info!("Classified {} free, {} stealth", free.len(), stealth.len());
         (free, stealth)
     }
@@ -138,17 +140,6 @@ impl Model {
             .is_some_and(|m| m.contains("image"))
     }
 
-    pub fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            tools: self.has_param("tools"),
-            tool_choice: self.has_param("tool_choice"),
-            parallel_tool_calls: self.has_param("parallel_tool_calls"),
-            json_mode: self.has_param("response_format"),
-            streaming: self.has_param("stream"),
-            vision: self.supports_vision(),
-        }
-    }
-
     pub fn display_id(&self) -> String {
         let id = self.id.as_str();
         let id = id.strip_suffix(":free").unwrap_or(id);
@@ -166,16 +157,6 @@ impl Model {
             object: "model".into(),
             created: self.created,
             owned_by: self.provider().to_owned(),
-            context_length: self.context_length,
-            max_completion_tokens: self
-                .top_provider
-                .as_ref()
-                .and_then(|t| t.max_completion_tokens),
-            capabilities: self.capabilities(),
-            pricing: self.pricing.as_ref().map(|p| OpenAIPricing {
-                prompt: p.prompt.clone().unwrap_or_default(),
-                completion: p.completion.clone().unwrap_or_default(),
-            }),
         }
     }
 
@@ -257,34 +238,11 @@ impl Model {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Capabilities {
-    pub tools: bool,
-    pub tool_choice: bool,
-    pub parallel_tool_calls: bool,
-    pub json_mode: bool,
-    pub streaming: bool,
-    pub vision: bool,
-}
-
-#[derive(Debug, Serialize, Clone)]
 pub struct OpenAIModel {
     pub id: String,
     pub object: String,
     pub created: i64,
     pub owned_by: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context_length: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_completion_tokens: Option<u64>,
-    pub capabilities: Capabilities,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pricing: Option<OpenAIPricing>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct OpenAIPricing {
-    pub prompt: String,
-    pub completion: String,
 }
 
 #[derive(Debug, Serialize)]

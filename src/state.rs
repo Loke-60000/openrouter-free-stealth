@@ -34,8 +34,6 @@ impl AppState {
         })
     }
 
-    /// Full refresh: classify all models and health-check everything.
-    /// Used on first startup when the cache is empty.
     pub async fn full_refresh(self: &Arc<Self>) {
         info!("Full model refresh (startup)");
 
@@ -64,10 +62,6 @@ impl AppState {
         info!("Model cache updated");
     }
 
-    /// Diff refresh: compare fresh model list against current cache.
-    /// - Removed models are dropped.
-    /// - Existing models are kept as-is (no re-ping).
-    /// - New models are health-checked before being added.
     pub async fn diff_refresh(self: &Arc<Self>) {
         info!("Diff model refresh");
 
@@ -103,55 +97,40 @@ impl AppState {
         fresh: Vec<Model>,
     ) -> Vec<Model> {
         let old_ids: HashSet<&str> = old.iter().map(|m| m.id.as_str()).collect();
-        let fresh_ids: HashSet<&str> = fresh.iter().map(|m| m.id.as_str()).collect();
 
-        // Models that disappeared upstream
-        let removed: Vec<_> = old_ids.difference(&fresh_ids).collect();
-        for id in &removed {
-            warn!("[{tier_name}] Removed: {id}");
-        }
+        let (added_count, removed_count, total) = {
+            let fresh_ids: HashSet<&str> = fresh.iter().map(|m| m.id.as_str()).collect();
 
-        // Models that are new upstream
-        let added_ids: HashSet<&&str> = fresh_ids.difference(&old_ids).collect();
-        let added: Vec<Model> = fresh
-            .iter()
-            .filter(|m| added_ids.contains(&m.id.as_str()))
-            .cloned()
-            .collect();
-
-        if !added.is_empty() {
-            info!("[{tier_name}] {} new model(s) to check", added.len());
-        }
-
-        // Keep existing models that are still present upstream
-        let mut result: Vec<Model> = old
-            .iter()
-            .filter(|m| fresh_ids.contains(m.id.as_str()))
-            .cloned()
-            .collect();
-
-        // Health-check only new models
-        if !added.is_empty() {
-            if let Some(ref key) = self.config.health_check_key {
-                let healthy =
-                    Model::health_check_batch(&self.client, key, added, self.config.health_check_concurrency).await;
-                result.extend(healthy);
-            } else {
-                result.extend(added);
+            for id in old_ids.difference(&fresh_ids) {
+                warn!("[{tier_name}] Removed upstream: {id}");
             }
-        }
 
-        if !removed.is_empty() || !added_ids.is_empty() {
-            info!(
-                "[{tier_name}] {} kept, {} removed, {} added -> {} total",
-                result.len() - added_ids.len().min(result.len()),
-                removed.len(),
-                added_ids.len(),
-                result.len()
-            );
+            let added = fresh_ids.difference(&old_ids).count();
+            if added > 0 {
+                info!("[{tier_name}] {added} new model(s) from upstream");
+            }
+
+            let removed = old_ids.difference(&fresh_ids).count();
+            (added, removed, fresh.len())
+        };
+
+        let result = if let Some(ref key) = self.config.health_check_key {
+            info!("[{tier_name}] Health-checking {total} models");
+            Model::health_check_batch(
+                &self.client,
+                key,
+                fresh,
+                self.config.health_check_concurrency,
+            )
+            .await
         } else {
-            info!("[{tier_name}] No changes ({} models)", result.len());
-        }
+            fresh
+        };
+
+        info!(
+            "[{tier_name}] {}/{total} passed ({added_count} new, {removed_count} dropped upstream)",
+            result.len()
+        );
 
         result
     }
